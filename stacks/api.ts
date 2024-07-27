@@ -1,30 +1,36 @@
-import { StackContext, Api, EventBus } from "sst/constructs";
+import { StackContext, Api, Table } from "sst/constructs";
 
 export function API({ stack }: StackContext) {
-  const bus = new EventBus(stack, "bus", {
-    defaults: {
-      retries: 10,
+  const table = new Table(stack, "CartaTable", {
+    fields: {
+      id: "string",
+      sk: "string",
     },
+    primaryIndex: { partitionKey: "id", sortKey: "sk" },
+    timeToLiveAttribute: "expiration",
   });
 
-  const api = new Api(stack, "api", {
-    defaults: {
-      function: {
-        bind: [bus],
+  const api = new Api(stack, "Api", {
+    routes: {
+      $default: {
+        function: {
+          handler: "packages/api/main.handler",
+          runtime: "python3.9",
+          timeout: 20,
+          memorySize: 1024,
+          architecture: "arm_64",
+          environment: {
+            TABLE_NAME: table.tableName,
+            CARTA_URL: "http://bustracker.gocarta.org",
+          },
+        },
       },
     },
-    routes: {
-      "GET /": "packages/functions/src/lambda.handler",
-      "GET /todo": "packages/functions/src/todo.list",
-      "POST /todo": "packages/functions/src/todo.create",
-    },
-  });
-
-  bus.subscribe("todo.created", {
-    handler: "packages/functions/src/events/todo-created.handler",
   });
 
   stack.addOutputs({
+    TableName: table.tableName,
+    TableArn: table.tableArn,
     ApiEndpoint: api.url,
   });
 }
