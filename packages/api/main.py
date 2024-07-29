@@ -1,9 +1,10 @@
 from os import environ
-from urllib import request, parse
+from urllib import request
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
 from aws_lambda_powertools.utilities.typing.lambda_context import LambdaContext
 from aws_lambda_powertools.logging import correlation_paths
+from xmlToJson import xmlStringToJson
 
 tracer = Tracer()
 logger = Logger()
@@ -16,7 +17,12 @@ baseUrl = environ.get('CARTA_URL', 'https://localhost:3000');
 def get_buses_by_route_id(route_id: str):
     url = f"{baseUrl}/bustime/map/getBusesForRoute.jsp?route={route_id}"
     response = request.urlopen(url).read().decode('utf-8')
-    return {"route_id": route_id, "response": response}
+    parsed_data = xmlStringToJson(response)
+
+    # write to dynamodb.
+
+    # return response
+    return {"route_id": route_id, "response": parsed_data}
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_HTTP)
 @tracer.capture_lambda_handler
